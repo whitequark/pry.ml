@@ -1,0 +1,13 @@
+OASISFormat: 0.4
+Name:        pry.ml
+Version:     0.0.1
+Synopsis:    a runtime developer console
+Authors:     Peter Zotov <whitequark@whitequark.org>
+License:     MIT
+Plugins:     META (0.4), DevFiles (0.4)
+BuildTools:  ocamlbuild
+
+Executable pry
+  Path:             lib/
+  MainIs:           pry.ml
+  BuildDepends:     bytes
