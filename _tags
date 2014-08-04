@@ -1,3 +1,4 @@
-<lib/{three,four}.{ml,mli}>: warn(@5@8@10@11@12@14@23@24@26@29@40)
-# OASIS_START
-# OASIS_STOP
+true: debug, warn(@5@8@10@11@12@14@23@24@26@29@40), bin_annot, safe_string
+"data": -traverse
+
+<src/*.{ml,mli,byte,native}>: package(compiler-libs.bytecomp), package(ppx_deriving)
