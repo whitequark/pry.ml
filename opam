@@ -1,0 +1,15 @@
+opam-version: "1.2.0"
+author: "Peter Zotov <whitequark@whitequark.org>"
+maintainer: "Peter Zotov <whitequark@whitequark.org>"
+name: "pry"
+version: "0.1"
+homepage: "https://github.com/whitequark/pry.ml"
+bug-reports: "https://github.com/whitequark/pry.ml/issues"
+license: "MIT"
+build: [
+  "ocaml" "pkg/build.ml" "native=%{ocaml-native}%"
+                         "native-dynlink=%{ocaml-native-dynlink}%"
+]
+depends: [
+  "ocamlfind"
+]

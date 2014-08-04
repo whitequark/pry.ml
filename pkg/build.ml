@@ -3,8 +3,10 @@
 #use "topkg.ml"
 
 let () =
-  Pkg.describe "ppx_deriving_protobuf" ~builder:`OCamlbuild [
-    Pkg.bin "src/pry.byte" ~dst:"pry-ml";
+  Pkg.describe "pry" ~builder:`OCamlbuild [
+    Pkg.lib "pkg/META";
+    Pkg.lib ~exts:(Exts.interface @ [".cma"]) "src/pry";
+    Pkg.lib "src/libcamlrunpry.a";
     Pkg.doc "README.md";
     Pkg.doc "LICENSE.txt";
     Pkg.doc "CHANGELOG.md"; ]

@@ -1,4 +1,9 @@
 true: debug, warn(@5@8@10@11@12@14@23@24@26@29@40), bin_annot, safe_string
 "data": -traverse
 
-<src/*.{ml,mli,byte,native}>: package(compiler-libs.bytecomp), package(ppx_deriving)
+"src": include
+"src/pry.cma": link_pry
+<src/*.{ml,mli}>: package(compiler-libs.bytecomp)
+
+<src_test/test_read.{ml,byte}>: package(compiler-libs.bytecomp), package(ppx_deriving)
+<src_test/test_inj.{ml,byte}>: use_pry

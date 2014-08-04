@@ -2,7 +2,8 @@ build:
 	ocaml pkg/build.ml native=true native-dynlink=true
 
 test: build
-	./pry.byte
+	ocamlbuild -use-ocamlfind -classic-display \
+						 ./src_test/test_inj.byte ./src_test/test_read.byte
 
 clean:
 	ocamlbuild -clean

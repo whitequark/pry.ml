@@ -1,0 +1,4 @@
+version = "%%VERSION%%"
+description = "Interactive toplevel and debugger"
+archive(byte) = "pry.cma"
+linkopts(byte) = "-custom -runtime-variant pry"
