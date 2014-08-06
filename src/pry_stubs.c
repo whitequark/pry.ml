@@ -1,52 +1,7 @@
-#include <stdio.h>
+#define CAML_NAME_SPACE
 #include <caml/mlvalues.h>
-
-enum event_kind {
-  EVENT_COUNT, BREAKPOINT, PROGRAM_START, PROGRAM_EXIT,
-  TRAP_BARRIER, UNCAUGHT_EXC
-};
-
-enum instructions {
-  ACC0, ACC1, ACC2, ACC3, ACC4, ACC5, ACC6, ACC7,
-  ACC, PUSH,
-  PUSHACC0, PUSHACC1, PUSHACC2, PUSHACC3,
-  PUSHACC4, PUSHACC5, PUSHACC6, PUSHACC7,
-  PUSHACC, POP, ASSIGN,
-  ENVACC1, ENVACC2, ENVACC3, ENVACC4, ENVACC,
-  PUSHENVACC1, PUSHENVACC2, PUSHENVACC3, PUSHENVACC4, PUSHENVACC,
-  PUSH_RETADDR, APPLY, APPLY1, APPLY2, APPLY3,
-  APPTERM, APPTERM1, APPTERM2, APPTERM3,
-  RETURN, RESTART, GRAB,
-  CLOSURE, CLOSUREREC,
-  OFFSETCLOSUREM2, OFFSETCLOSURE0, OFFSETCLOSURE2, OFFSETCLOSURE,
-  PUSHOFFSETCLOSUREM2, PUSHOFFSETCLOSURE0,
-  PUSHOFFSETCLOSURE2, PUSHOFFSETCLOSURE,
-  GETGLOBAL, PUSHGETGLOBAL, GETGLOBALFIELD, PUSHGETGLOBALFIELD, SETGLOBAL,
-  ATOM0, ATOM, PUSHATOM0, PUSHATOM,
-  MAKEBLOCK, MAKEBLOCK1, MAKEBLOCK2, MAKEBLOCK3, MAKEFLOATBLOCK,
-  GETFIELD0, GETFIELD1, GETFIELD2, GETFIELD3, GETFIELD, GETFLOATFIELD,
-  SETFIELD0, SETFIELD1, SETFIELD2, SETFIELD3, SETFIELD, SETFLOATFIELD,
-  VECTLENGTH, GETVECTITEM, SETVECTITEM,
-  GETSTRINGCHAR, SETSTRINGCHAR,
-  BRANCH, BRANCHIF, BRANCHIFNOT, SWITCH, BOOLNOT,
-  PUSHTRAP, POPTRAP, RAISE,
-  CHECK_SIGNALS,
-  C_CALL1, C_CALL2, C_CALL3, C_CALL4, C_CALL5, C_CALLN,
-  CONST0, CONST1, CONST2, CONST3, CONSTINT,
-  PUSHCONST0, PUSHCONST1, PUSHCONST2, PUSHCONST3, PUSHCONSTINT,
-  NEGINT, ADDINT, SUBINT, MULINT, DIVINT, MODINT,
-  ANDINT, ORINT, XORINT, LSLINT, LSRINT, ASRINT,
-  EQ, NEQ, LTINT, LEINT, GTINT, GEINT,
-  OFFSETINT, OFFSETREF, ISINT,
-  GETMETHOD,
-  BEQ, BNEQ,  BLTINT, BLEINT, BGTINT, BGEINT,
-  ULTINT, UGEINT,
-  BULTINT, BUGEINT,
-  GETPUBMET, GETDYNMET,
-  STOP,
-  EVENT, BREAK,
-  RERAISE, RAISE_NOTRACE,
-FIRST_UNIMPLEMENTED_OP};
+#include <caml/memory.h>
+#include <caml/callback.h>
 
 CAMLextern value * caml_stack_low;
 CAMLextern value * caml_stack_high;
@@ -55,16 +10,46 @@ CAMLextern value * caml_extern_sp;
 CAMLextern value * caml_trapsp;
 CAMLextern value * caml_trap_barrier;
 
-#define Trap_pc(tp) (((code_t *)(tp))[0])
-#define Trap_link(tp) (((value **)(tp))[1])
-
 extern code_t caml_start_code;
 extern asize_t caml_code_size;
 extern unsigned char * caml_saved_code;
 
+int caml_debugger_in_use;
+
+enum event_kind { /* sync with debugger.h */
+  EVENT_COUNT, BREAKPOINT, PROGRAM_START, PROGRAM_EXIT,
+  TRAP_BARRIER, UNCAUGHT_EXC
+};
+
 void caml_set_instruction (code_t pos, opcode_t instr);
 
-int caml_debugger_in_use;
+#define GETTER(name) value pry_ ## name(value Unit) { return (value) caml_ ## name; }
+GETTER(stack_low)
+GETTER(stack_high)
+GETTER(extern_sp)
+GETTER(trapsp)
+GETTER(trap_barrier)
+#undef GETTER
+
+void pry_set_instruction(code_t pos, value opcode) {
+  caml_set_instruction(pos, Int_val(opcode));
+}
+
+void pry_reset_instruction(code_t pos) {
+  caml_set_instruction(pos, *(pos - caml_start_code + caml_saved_code));
+}
+
+code_t pry_pc_to_code(value pc) {
+  return caml_start_code + Int_val(pc) / sizeof(opcode_t);
+}
+
+value pry_pc_of_code(code_t pos) {
+  return Val_long((pos - caml_start_code) * sizeof(opcode_t));
+}
+
+value pry_in_bounds(void *low, void *high, void *ptr) {
+  return Val_int(ptr >= low && ptr < high);
+}
 
 void __wrap_caml_debugger_init() {
   caml_debugger_in_use = 1;
@@ -72,12 +57,9 @@ void __wrap_caml_debugger_init() {
 }
 
 void __wrap_caml_debugger(enum event_kind event) {
-  printf("caml_debugger(%d)\n", event);
-  if (event == PROGRAM_START) {
-    int pos = 44;
-    caml_set_instruction(caml_start_code + pos / sizeof(opcode_t), BREAK);
-  }
-  return;
+  value *callback = caml_named_value("Pry_agent.callback");
+  if (callback)
+    caml_callback2(*callback, Val_int(event), (value) caml_extern_sp);
 }
 
 void __wrap_caml_debugger_cleanup_fork() {

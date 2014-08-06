@@ -5,6 +5,9 @@ test: build
 	ocamlbuild -use-ocamlfind -classic-display \
 						 ./src_test/test_inj.byte ./src_test/test_read.byte
 
+testinj: test
+	setarch `uname -m` -R ./test_inj.byte
+
 clean:
 	ocamlbuild -clean
 
