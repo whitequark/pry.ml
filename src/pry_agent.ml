@@ -1,3 +1,5 @@
+open Instruct
+
 type agent_event =
 | Event_count
 | Breakpoint
@@ -6,7 +8,7 @@ type agent_event =
 | Trap_barrier
 | Uncaught_exc
 
-type frame = Obj.t * Instruct.debug_event
+type frame = Obj.t * debug_event
 
 external stack_low    : unit -> Obj.t = "pry_stack_low"
 external stack_high   : unit -> Obj.t = "pry_stack_high"
@@ -33,12 +35,12 @@ let offset_frame frame words =
   Obj.add_offset frame (Int32.of_int (words * word_size))
 
 let find_event frame =
-  !debug_events |> List.find (fun { Instruct.ev_pos } -> ev_pos = pc_of_frame frame)
+  !debug_events |> List.find (fun { ev_pos } -> ev_pos = pc_of_frame frame)
 
 let debug_event_of_frame = snd
 
 let up_frame (frame, event) =
-  let nlocals = event.Instruct.ev_stacksize in
+  let nlocals = event.ev_stacksize in
   let offset  = (extra_of_frame frame) + 3 + nlocals in
   let frame'  = offset_frame frame offset in
   if in_bounds ~low:(stack_low ()) ~high:(stack_high ()) frame' then
@@ -46,10 +48,40 @@ let up_frame (frame, event) =
   else
     None
 
-let set_breakpoint { Instruct.ev_pos } =
+let rec iter_frames f frame =
+  f frame;
+  match up_frame frame with
+  | Some frame -> iter_frames f frame
+  | None -> ()
+
+let rec fold_frames f acc frame =
+  let acc = f acc frame in
+  match up_frame frame with
+  | Some frame -> fold_frames f acc frame
+  | None -> acc
+
+let frame_env (frame, { ev_typenv; ev_typsubst }) =
+  Envaux.env_from_summary ev_typenv ev_typsubst
+
+let frame_locals (frame, { ev_compenv }) =
+  let keys tbl = Ident.fold_all (fun k _ accu -> k::accu) tbl [] in
+  keys ev_compenv.ce_stack @ keys ev_compenv.ce_heap @ keys ev_compenv.ce_rec
+
+let frame_local (frame, { ev_compenv }) ident =
+  match Ident.find_same ident ev_compenv.ce_stack with
+  | idx -> local_of_frame frame idx
+  | exception Not_found ->
+    match Ident.find_same ident ev_compenv.ce_heap with
+    | idx -> Obj.field (env_of_frame frame) idx
+    | exception Not_found ->
+      match Ident.find_same ident ev_compenv.ce_rec with
+      | idx -> assert false
+      | exception (Not_found as exn) -> raise exn
+
+let set_breakpoint { ev_pos } =
   set_instruction (pc_to_code ev_pos) Opcodes.opBREAK
 
-let reset_breakpoint { Instruct.ev_pos } =
+let reset_breakpoint { ev_pos } =
   reset_instruction (pc_to_code ev_pos)
 
 let breakpoint = fun () -> ()
@@ -59,10 +91,21 @@ let callback : ([ `Breakpoint ] -> frame -> unit) ref = ref (fun _ _ -> ())
 let () =
   set_instruction (Obj.field (Obj.repr breakpoint) 0) Opcodes.opBREAK;
   Callback.register "Pry_agent.callback" (fun agent_event frame ->
-    let frame = offset_frame frame 1 in
-    match agent_event with
-    | Breakpoint -> !callback `Breakpoint (frame, find_event frame)
-    | _ -> ());
-  let chan = open_in Sys.executable_name in
-  debug_events := Pry_bytecode.((read chan).di_events);
-  close_in chan
+    try
+      let frame = offset_frame frame 1 in
+      match agent_event with
+      | Breakpoint -> !callback `Breakpoint (frame, find_event frame)
+      | _ -> ()
+    with exn ->
+      Printf.eprintf "Exception in Pry_agent.callback:\n%s\n"
+                     (Printexc.to_string exn);
+      Printexc.print_backtrace stderr);
+  let debug_info =
+    let chan = open_in Sys.executable_name in
+    let data = Pry_bytecode.read chan in
+    close_in chan;
+    data
+  in
+  debug_events     := debug_info.Pry_bytecode.di_events;
+  Config.load_path := Config.standard_library :: debug_info.Pry_bytecode.di_paths;
+  Envaux.reset_cache ()

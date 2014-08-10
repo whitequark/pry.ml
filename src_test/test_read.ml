@@ -5,7 +5,7 @@ let () =
     match events with
     | [] -> ()
     | event :: events ->
-      Format.printf "%a@." Pry_bytecode.pp_debug_event event;
+      Format.printf "%a@." Pry_instruct.pp_debug_event event;
       loop events
   in
   loop di.Pry_bytecode.di_events

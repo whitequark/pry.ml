@@ -4,4 +4,4 @@ let rec fact n =
   else n
 
 let _ =
-  fact 5
+  fact 2

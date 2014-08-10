@@ -11,6 +11,23 @@ val debug_event_of_frame : frame -> Instruct.debug_event
     or [None] if [frame] is the topmost one. *)
 val up_frame : frame -> frame option
 
+(** [iter_frames f frame] iterates all frames, starting with topmost [frame]. *)
+val iter_frames : (frame -> unit) -> frame -> unit
+
+(** [fold_frames f acc frame] folds all frames, starting with topmost [frame]. *)
+val fold_frames : ('a -> frame -> 'a) -> 'a -> frame -> 'a
+
+(** [frame_env frame] returns a typing environment for the context of
+    [frame]. *)
+val frame_env : frame -> Env.t
+
+(** [frame_locals frame] returns a list of identifiers local to [frame]. *)
+val frame_locals : frame -> Ident.t list
+
+(** [frame_local frame name] returns the value of identifier [name], bound
+    in [frame]. *)
+val frame_local : frame -> Ident.t -> Obj.t
+
 (** [set_breakpoint event] sets a breakpoint at [event].
     [set_breakpoint] is idempotent. *)
 val set_breakpoint : Instruct.debug_event -> unit
